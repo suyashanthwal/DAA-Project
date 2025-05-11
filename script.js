@@ -1,5 +1,5 @@
 // Initialize map
-let map = L.map('map').setView([30.3165, 78.0322], 13);
+let map = L.map('map').setView([40.7128, -74.0060], 13); // Updated coordinates for New York City
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 // UI Elements
@@ -33,17 +33,31 @@ let markers = {
 function validateCoordinate(input, errorElement) {
     const value = input.value.trim();
     if (!value) {
-        errorElement.style.display = 'none';
+        errorElement.textContent = 'Coordinate is required';
+        errorElement.style.display = 'block';
         return false;
     }
-    const [lat, lng] = value.split(',').map(Number);
-    const isValid = !isNaN(lat) && !isNaN(lng) && 
-                  lat >= -90 && lat <= 90 && 
-                  lng >= -180 && lng <= 180;
+    const parts = value.split(',').map(part => part.trim()); // Trim whitespace around coordinates
+    if (parts.length !== 2) {
+        errorElement.textContent = 'Invalid coordinates format. Use "lat,lng".';
+        errorElement.style.display = 'block';
+        return false;
+    }
+    const [lat, lng] = parts.map(Number);
+    if (isNaN(lat) || isNaN(lng)) {
+        errorElement.textContent = 'Coordinates must be numbers.';
+        errorElement.style.display = 'block';
+        return false;
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        errorElement.textContent = 'Coordinates out of range.';
+        errorElement.style.display = 'block';
+        return false;
+    }
 
-    errorElement.textContent = isValid ? '' : 'Invalid coordinates format';
-    errorElement.style.display = isValid ? 'none' : 'block';
-    return isValid;
+    errorElement.textContent = '';
+    errorElement.style.display = 'none';
+    return true;
 }
 
 function validateInputs() {
@@ -52,63 +66,30 @@ function validateInputs() {
     routeBtn.disabled = !(sourceValid && destValid);
 }
 
+function addMarker(lat, lng, type) {
+    if (markers[type]) {
+        map.removeLayer(markers[type]);
+    }
+    markers[type] = L.marker([lat, lng], { icon: icons[type] })
+        .addTo(map)
+        .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} Location`);
+}
+
 // Event listeners
 sourceInput.addEventListener('input', () => {
-    validateInputs();
-    if (markers.source) map.removeLayer(markers.source);
+    if (validateCoordinate(sourceInput, sourceError)) {
+        const [lat, lng] = sourceInput.value.split(',').map(Number);
+        addMarker(lat, lng, 'source');
+    }
 });
 
 destInput.addEventListener('input', () => {
-    validateInputs();
-    if (markers.destination) map.removeLayer(markers.destination);
+    if (validateCoordinate(destInput, destError)) {
+        const [lat, lng] = destInput.value.split(',').map(Number);
+        addMarker(lat, lng, 'destination');
+    }
 });
 
-// Route drawing
-function drawRoute() {
-    const [srcLat, srcLng] = sourceInput.value.split(',').map(Number);
-    const [destLat, destLng] = destInput.value.split(',').map(Number);
-    
-    const src = L.latLng(srcLat, srcLng);
-    const dest = L.latLng(destLat, destLng);
-
-    // Clear previous
-    if (markers.route) {
-        map.removeControl(markers.route);
-        markers.route = null;
-    }
-    if (markers.source) {
-        map.removeLayer(markers.source);
-        markers.source = null;
-    }
-    if (markers.destination) {
-        map.removeLayer(markers.destination);
-        markers.destination = null;
-    }
-
-    // Add markers
-    markers.source = L.marker(src, { icon: icons.source })
-        .addTo(map)
-        .bindPopup('Source Location');
-    
-    markers.destination = L.marker(dest, { icon: icons.destination })
-        .addTo(map)
-        .bindPopup('Destination');
-
-    // Create route
-    markers.route = L.Routing.control({
-        waypoints: [src, dest],
-        routeWhileDragging: false,
-        show: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        createMarker: () => null
-    }).on('routesfound', e => {
-        const route = e.routes[0];
-        map.fitBounds(route.coordinates);
-        document.getElementById('distance').textContent = (route.summary.totalDistance / 1000).toFixed(2);
-        document.getElementById('time').textContent = (route.summary.totalTime / 60).toFixed(1);
-        document.getElementById('status').textContent = 'Route calculated';
-    }).on('routingerror', () => {
-        document.getElementById('status').textContent = 'Routing failed - check coordinates';
-    }).addTo(map);
-}
+routeBtn.addEventListener('click', () => {
+    console.log('Route button clicked'); // Placeholder for your C++ implementation
+});

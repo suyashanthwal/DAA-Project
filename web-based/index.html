@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emergency Routing Map</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="input">
+                <label for="source"><b>SOURCE</b></label>
+                <input type="text" id="source" placeholder="Example: 28.6139,77.2090">
+                <div class="invalid-feedback" id="source-error"></div>
+
+                <label for="destination"><b>DESTINATION</b></label>
+                <input type="text" id="destination" placeholder="Example: 30.3165,78.0322">
+                <div class="invalid-feedback" id="dest-error"></div>
+
+                <button id="routeBtn" onclick="drawRoute()" disabled>SHOW ROUTE</button>
+            </div>
+
+            <div class="info">
+                <b>Estimated Distance:</b> <span id="distance">--</span> km<br>
+                <b>Estimated Time:</b> <span id="time">--</span> mins<br>
+                <b>Status:</b> <span id="status">Enter coordinates to begin</span>
+            </div>
+        </div>
+        <!-- Map -->
+        <div id="map"></div>
+    </div>
+    <!-- JS Libraries -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+</body>
+</html>

@@ -9,6 +9,12 @@ const destInput = document.getElementById('destination');
 const sourceError = document.getElementById('source-error');
 const destError = document.getElementById('dest-error');
 
+// Add live location button
+const liveLocationBtn = document.createElement('button');
+liveLocationBtn.textContent = 'Use My Location';
+liveLocationBtn.className = 'live-location-btn';
+sourceInput.parentNode.insertBefore(liveLocationBtn, sourceInput.nextSibling);
+
 // Marker icons
 const icons = {
     source: L.icon({
@@ -75,6 +81,39 @@ function addMarker(lat, lng, type) {
         .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} Location`);
 }
 
+// Function to get live location
+function getLiveLocation() {
+    if (navigator.geolocation) {
+        liveLocationBtn.textContent = 'Getting Location...';
+        liveLocationBtn.disabled = true;
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                sourceInput.value = `${lat},${lng}`;
+                addMarker(lat, lng, 'source');
+                validateInputs();
+                liveLocationBtn.textContent = 'Use My Location';
+                liveLocationBtn.disabled = false;
+            },
+            (error) => {
+                console.error('Error getting location:', error);
+                sourceError.textContent = 'Could not get your location. Please enter coordinates manually.';
+                sourceError.style.display = 'block';
+                liveLocationBtn.textContent = 'Use My Location';
+                liveLocationBtn.disabled = false;
+            }
+        );
+    } else {
+        sourceError.textContent = 'Geolocation is not supported by your browser';
+        sourceError.style.display = 'block';
+    }
+}
+
+// Add click event listener for live location button
+liveLocationBtn.addEventListener('click', getLiveLocation);
+
 // Event listeners
 sourceInput.addEventListener('input', () => {
     if (validateCoordinate(sourceInput, sourceError)) {
@@ -93,3 +132,11 @@ destInput.addEventListener('input', () => {
 routeBtn.addEventListener('click', () => {
     console.log('Route button clicked'); // Placeholder for your C++ implementation
 });
+// Add map click handler
+map.on('click', (e) => {
+    const { lat, lng } = e.latlng;
+    destInput.value = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    addMarker(lat, lng, 'destination');
+    validateInputs();
+});
+

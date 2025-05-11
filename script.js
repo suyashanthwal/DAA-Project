@@ -139,4 +139,3 @@ map.on('click', (e) => {
     addMarker(lat, lng, 'destination');
     validateInputs();
 });
-

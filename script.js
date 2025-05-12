@@ -168,17 +168,6 @@ async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
         console.log('Fetching traffic lights for bounding box:', bbox);
 
         const trafficLights = await getTrafficLights(bbox);
-
-        trafficLights.forEach(light => {
-            L.marker([light.lat, light.lon], {
-                icon: L.icon({
-                    iconUrl: 'scr/traffic.png',
-                    iconSize: [25, 25],
-                    iconAnchor: [10, 32]
-                })
-            }).addTo(map).bindPopup('Traffic Light');
-        });
-
         console.log(`${trafficLights.length} traffic lights loaded.`);
 
         const { graphEdges } = constructGraph(trafficLights);

@@ -43,7 +43,7 @@ function validateCoordinate(input, errorElement) {
         errorElement.style.display = 'block';
         return false;
     }
-    const parts = value.split(',').map(part => part.trim()); // Trim whitespace around coordinates
+    const parts = value.split(',').map(part => part.trim());
     if (parts.length !== 2) {
         errorElement.textContent = 'Invalid coordinates format. Use "lat,lng".';
         errorElement.style.display = 'block';
@@ -86,7 +86,7 @@ function getLiveLocation() {
     if (navigator.geolocation) {
         liveLocationBtn.textContent = 'Getting Location...';
         liveLocationBtn.disabled = true;
-        
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const lat = position.coords.latitude;
@@ -163,26 +163,24 @@ async function getTrafficLights(bbox) {
 // Function to load traffic lights dynamically based on the bounding box
 async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
     try {
-        const padding = 0.002; // Reduce the bounding box padding to 0.003 degrees (~0.33 km)
+        const padding = 0.002;
         const bbox = calculateBoundingBox(sourceCoords[0], sourceCoords[1], destCoords[0], destCoords[1], padding);
         console.log('Fetching traffic lights for bounding box:', bbox);
 
         const trafficLights = await getTrafficLights(bbox);
 
-        // Add traffic lights as markers on the map
         trafficLights.forEach(light => {
             L.marker([light.lat, light.lon], {
                 icon: L.icon({
-                    iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 24]
+                    iconUrl: 'scr/traffic.png',
+                    iconSize: [25, 25],
+                    iconAnchor: [10, 32]
                 })
             }).addTo(map).bindPopup('Traffic Light');
         });
 
         console.log(`${trafficLights.length} traffic lights loaded.`);
 
-        // Construct the graph using traffic lights
         const { graphEdges } = constructGraph(trafficLights);
         return { trafficLights, graphEdges };
     } catch (error) {
@@ -193,31 +191,19 @@ async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
 
 // Function to construct the graph with traffic lights
 function constructGraph(trafficLights) {
-    const MAX_DISTANCE = 1; // Maximum distance in km to connect two traffic lights
+    const MAX_DISTANCE = 1;
     const graphEdges = [];
 
-    // Create edges only between nearby traffic lights
     for (let i = 0; i < trafficLights.length; i++) {
         for (let j = i + 1; j < trafficLights.length; j++) {
             const lightA = trafficLights[i];
             const lightB = trafficLights[j];
 
-            // Calculate distance between two traffic lights
             const distance = calculateDistance(lightA.lat, lightA.lon, lightB.lat, lightB.lon);
 
-            // Add edge only if the distance is within the limit
             if (distance <= MAX_DISTANCE) {
-                graphEdges.push([lightA.id, lightB.id, Math.round(distance * 1000)]); // Convert to meters
-                graphEdges.push([lightB.id, lightA.id, Math.round(distance * 1000)]); // Convert to meters
-
-                // Visualize the edge on the map
-                L.polyline(
-                    [
-                        [lightA.lat, lightA.lon],
-                        [lightB.lat, lightB.lon]
-                    ],
-                    { color: 'orange', weight: 1, opacity: 0.7 }
-                ).addTo(map);
+                graphEdges.push([lightA.id, lightB.id, Math.round(distance * 1000)]);
+                graphEdges.push([lightB.id, lightA.id, Math.round(distance * 1000)]);
             }
         }
     }
@@ -227,8 +213,184 @@ function constructGraph(trafficLights) {
     return { trafficLights, graphEdges };
 }
 
+// Haversine formula to calculate distance between two lat/lng points
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Function to find the closest traffic light node to a given latitude and longitude
+function findClosestNode(lat, lon, trafficLights) {
+    let closestNode = null;
+    let minDistance = Infinity;
+
+    trafficLights.forEach((light, index) => {
+        const distance = calculateDistance(lat, lon, light.lat, light.lon);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestNode = index;
+        }
+    });
+
+    return closestNode;
+}
+
+// Function to calculate the shortest path using Dijkstra's algorithm in JavaScript
+function findShortestPath(trafficLights, graphEdges) {
+    const sourceCoords = sourceInput.value.split(',').map(Number);
+    const destCoords = destInput.value.split(',').map(Number);
+
+    // Find the closest traffic lights to the source and destination
+    const sourceNode = trafficLights.length; // Temporary node for source
+    const destNode = trafficLights.length + 1; // Temporary node for destination
+
+    // Add source and destination as temporary nodes
+    trafficLights.push({ id: sourceNode, lat: sourceCoords[0], lon: sourceCoords[1] });
+    trafficLights.push({ id: destNode, lat: destCoords[0], lon: destCoords[1] });
+
+    // Connect source and destination to their closest traffic lights
+    const sourceClosest = findClosestNode(sourceCoords[0], sourceCoords[1], trafficLights.slice(0, -2));
+    const destClosest = findClosestNode(destCoords[0], destCoords[1], trafficLights.slice(0, -2));
+
+    if (sourceClosest === null || destClosest === null) {
+        console.error('Could not find closest traffic lights');
+        return;
+    }
+
+    graphEdges.push([sourceNode, sourceClosest, Math.round(calculateDistance(
+        sourceCoords[0], sourceCoords[1],
+        trafficLights[sourceClosest].lat, trafficLights[sourceClosest].lon
+    ) * 1000)]);
+
+    graphEdges.push([destNode, destClosest, Math.round(calculateDistance(
+        destCoords[0], destCoords[1],
+        trafficLights[destClosest].lat, trafficLights[destClosest].lon
+    ) * 1000)]);
+
+    console.log(`Source Node: ${sourceNode}, Destination Node: ${destNode}`);
+
+    // Build the graph as an adjacency list
+    const graph = {};
+    trafficLights.forEach(light => {
+        graph[light.id] = [];
+    });
+    graphEdges.forEach(([from, to, weight]) => {
+        graph[from].push({ to, weight });
+    });
+
+    // Initialize distances and previous nodes
+    const dist = {};
+    const prev = {};
+    const visited = new Set();
+
+    trafficLights.forEach(light => {
+        dist[light.id] = Infinity;
+        prev[light.id] = null;
+    });
+    dist[sourceNode] = 0;
+
+    // Dijkstra's algorithm without a priority queue
+    while (visited.size < trafficLights.length) {
+        // Find the unvisited node with the smallest distance
+        let currentNode = null;
+        let currentDist = Infinity;
+
+        for (const node in dist) {
+            if (!visited.has(node) && dist[node] < currentDist) {
+                currentNode = node;
+                currentDist = dist[node];
+            }
+        }
+
+        if (currentNode === null) break; // No reachable nodes remain
+        visited.add(currentNode);
+
+        // Update distances to neighbors
+        for (const { to, weight } of graph[currentNode]) {
+            const alt = dist[currentNode] + weight;
+            if (alt < dist[to]) {
+                dist[to] = alt;
+                prev[to] = currentNode;
+            }
+        }
+    }
+
+    // Reconstruct the shortest path
+    const path = [];
+    for (let at = destNode; at !== null; at = prev[at]) {
+        path.push(at);
+    }
+    path.reverse();
+
+    if (path[0] !== sourceNode) {
+        console.error('No path found');
+        return;
+    }
+
+    console.log('Shortest Path:', path);
+
+    // Display the shortest path
+    displayShortestPath(path, trafficLights);
+}
+
+// Function to display only the traffic lights on the shortest path
+function displayShortestPath(path, trafficLights) {
+    trafficLights.forEach(light => {
+        if (light.marker) {
+            map.removeLayer(light.marker);
+        }
+    });
+
+    path.forEach(nodeId => {
+        const light = trafficLights[nodeId];
+        light.marker = L.marker([light.lat, light.lon], {
+            icon: L.icon({
+                iconUrl: 'scr/traffic.png',
+                iconSize: [25, 25],
+                iconAnchor: [10, 32]
+            })
+        }).addTo(map).bindPopup('Traffic Light');
+    });
+
+    animatePath(path, trafficLights);
+}
+
+// Function to animate the shortest path
+function animatePath(path, trafficLights) {
+    const pathCoordinates = path.map(nodeId => {
+        const light = trafficLights[nodeId];
+        return [light.lat, light.lon];
+    });
+
+    let index = 0;
+    const polyline = L.polyline([], { color: 'blue', weight: 4 }).addTo(map);
+
+    function drawNextSegment() {
+        if (index < pathCoordinates.length) {
+            polyline.addLatLng(pathCoordinates[index]);
+            index++;
+            setTimeout(drawNextSegment, 300);
+        } else {
+            console.log('Animation complete');
+        }
+    }
+
+    drawNextSegment();
+}
+
 // Update the route button to dynamically load traffic lights and find the shortest path
-routeBtn.addEventListener('click', async () => {
+routeBtn.addEventListener('click', async (event) => {
+    event.preventDefault();
+
     const sourceCoords = sourceInput.value.split(',').map(Number);
     const destCoords = destInput.value.split(',').map(Number);
 
@@ -237,7 +399,6 @@ routeBtn.addEventListener('click', async () => {
         return;
     }
 
-    // Load traffic lights for the bounding box
     const { trafficLights, graphEdges } = await loadTrafficLightsForBoundingBox(sourceCoords, destCoords);
 
     if (trafficLights.length === 0 || graphEdges.length === 0) {
@@ -245,11 +406,9 @@ routeBtn.addEventListener('click', async () => {
         return;
     }
 
-    // Log the graph for debugging
     console.log('Traffic Lights:', trafficLights);
     console.log('Graph Edges:', graphEdges);
 
-    // Find the shortest path using the loaded traffic lights and graph
     findShortestPath(trafficLights, graphEdges);
 });
 

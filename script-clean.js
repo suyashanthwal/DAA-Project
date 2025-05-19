@@ -1,3 +1,4 @@
+// <------------------- priyanshu---------------->
 // Initialize map
 let map = L.map('map').setView([40.7128, -74.0060], 13); // Updated coordinates for New York City
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -72,8 +73,6 @@ function validateInputs() {
     routeBtn.disabled = !(sourceValid && destValid);
 }
 
-//////////////////////////////////////////////////////////////////////
-
 function addMarker(lat, lng, type) {
     if (markers[type]) {
         map.removeLayer(markers[type]);
@@ -129,7 +128,9 @@ destInput.addEventListener('input', () => {
         addMarker(lat, lng, 'destination');
     }
 });
+// <------------------- priyanshu---------------->
 
+// <-------------------suyash-------------------->
 // Function to calculate the bounding box between two coordinates with reduced padding
 function calculateBoundingBox(lat1, lon1, lat2, lon2, padding = 0.003) {
     const minLat = Math.min(lat1, lat2) - padding;
@@ -175,7 +176,9 @@ async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
         return { trafficLights: [], graphEdges: [] };
     }
 }
+// <-------------------suyash-------------------->
 
+// <-------------------anushk-------------------->
 // Function to construct the graph with traffic lights
 function constructGraph(trafficLights) {
     const MAX_DISTANCE = 0.15; // Reduced to 150m for better edge density
@@ -313,7 +316,9 @@ function connectToMultipleNodes(lat, lon, trafficLights, graphEdges, nodeId) {
         graphEdges.push([closestNode, nodeId, Math.round(distance * 1000)]);
     }
 }
+// <-------------------anushk-------------------->
 
+// <-------------------suyash-------------------->
 // Function to display only the traffic lights on the shortest path
 function displayShortestPath(path, trafficLights) {
     trafficLights.forEach(light => {
@@ -395,3 +400,4 @@ map.on('click', (e) => {
     addMarker(lat, lng, 'destination');
     validateInputs();
 });
+// <-------------------suyash-------------------->

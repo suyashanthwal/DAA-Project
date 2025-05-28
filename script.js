@@ -1,22 +1,25 @@
-// <------------------- priyanshu---------------->
-// Initialize map
-let map = L.map('map').setView([40.7128, -74.0060], 13); // Updated coordinates for New York City
+// Add map overlay
+const mapOverlay = document.createElement('div');
+mapOverlay.className = 'map-overlay';
+document.querySelector('.container').appendChild(mapOverlay);
+
+// Initialize map and other variables
+let map = L.map('map').setView([40.7128, -74.0060], 13); 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// UI Elements
 const routeBtn = document.getElementById('routeBtn');
 const sourceInput = document.getElementById('source');
 const destInput = document.getElementById('destination');
 const sourceError = document.getElementById('source-error');
 const destError = document.getElementById('dest-error');
+const showLocationBtn = document.getElementById('showLocation');
 
-// Add live location button
 const liveLocationBtn = document.createElement('button');
 liveLocationBtn.textContent = 'Use My Location';
 liveLocationBtn.className = 'live-location-btn';
 sourceInput.parentNode.insertBefore(liveLocationBtn, sourceInput.nextSibling);
 
-// Marker icons
+
 const icons = {
     source: L.icon({
         iconUrl: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
@@ -36,7 +39,7 @@ let markers = {
     route: null
 };
 
-// Input validation
+
 function validateCoordinate(input, errorElement) {
     const value = input.value.trim();
     if (!value) {
@@ -82,7 +85,6 @@ function addMarker(lat, lng, type) {
         .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} Location`);
 }
 
-// Function to get live location
 function getLiveLocation() {
     if (navigator.geolocation) {
         liveLocationBtn.textContent = 'Getting Location...';
@@ -111,7 +113,6 @@ function getLiveLocation() {
     }
 }
 
-// Add click event listener for live location button
 liveLocationBtn.addEventListener('click', getLiveLocation);
 
 // Event listeners
@@ -128,10 +129,7 @@ destInput.addEventListener('input', () => {
         addMarker(lat, lng, 'destination');
     }
 });
-// <------------------- priyanshu---------------->
 
-// <-------------------suyash-------------------->
-// Function to calculate the bounding box between two coordinates with reduced padding
 function calculateBoundingBox(lat1, lon1, lat2, lon2, padding = 0.003) {
     const minLat = Math.min(lat1, lat2) - padding;
     const maxLat = Math.max(lat1, lat2) + padding;
@@ -140,7 +138,6 @@ function calculateBoundingBox(lat1, lon1, lat2, lon2, padding = 0.003) {
     return `${minLat},${minLon},${maxLat},${maxLon}`;
 }
 
-// Function to fetch traffic lights using Overpass API
 async function getTrafficLights(bbox) {
     const overpassQuery = `[out:json];
         node[highway=traffic_signals](${bbox});
@@ -162,7 +159,6 @@ async function getTrafficLights(bbox) {
     }));
 }
 
-// Function to load traffic lights dynamically based on the bounding box
 async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
     try {
         const padding = 0.002;
@@ -176,12 +172,9 @@ async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
         return { trafficLights: [], graphEdges: [] };
     }
 }
-// <-------------------suyash-------------------->
 
-// <-------------------anushk-------------------->
-// Function to construct the graph with traffic lights
 function constructGraph(trafficLights) {
-    const MAX_DISTANCE = 0.15; // Reduced to 150m for better edge density
+    const MAX_DISTANCE = 0.15;
     const graphEdges = [];
 
     for (let i = 0; i < trafficLights.length; i++) {
@@ -201,7 +194,6 @@ function constructGraph(trafficLights) {
     return { trafficLights, graphEdges };
 }
 
-// Haversine formula to calculate distance between two lat/lng points
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -216,7 +208,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Function to find the closest traffic light node to a given latitude and longitude
 function findClosestNode(lat, lon, trafficLights) {
     let closestNode = null;
     let minDistance = Infinity;
@@ -232,7 +223,6 @@ function findClosestNode(lat, lon, trafficLights) {
     return closestNode;
 }
 
-// Function to calculate the shortest path using Dijkstra's algorithm in JavaScript
 function findShortestPath(trafficLights, graphEdges) {
     const sourceCoords = sourceInput.value.split(',').map(Number);
     const destCoords = destInput.value.split(',').map(Number);
@@ -301,9 +291,8 @@ function findShortestPath(trafficLights, graphEdges) {
     displayShortestPath(path, trafficLights);
 }
 
-// Function to connect source/destination to multiple nearby traffic lights
 function connectToMultipleNodes(lat, lon, trafficLights, graphEdges, nodeId) {
-    const CONNECT_TO_COUNT = 3; // Connect to 3 closest nodes
+    const CONNECT_TO_COUNT = 3;
     const distances = trafficLights.map((light, index) => ({
         index,
         distance: calculateDistance(lat, lon, light.lat, light.lon)
@@ -319,10 +308,8 @@ function connectToMultipleNodes(lat, lon, trafficLights, graphEdges, nodeId) {
         graphEdges.push([closestNode, nodeId, Math.round(distance * 1000)]);
     }
 }
-// <-------------------anushk-------------------->
 
-// <-------------------suyash-------------------->
-// Function to display only the traffic lights on the shortest path
+
 function displayShortestPath(path, trafficLights) {
     trafficLights.forEach(light => {
         if (light.marker) {
@@ -344,7 +331,6 @@ function displayShortestPath(path, trafficLights) {
     animatePath(path, trafficLights);
 }
 
-// Function to animate the shortest path
 function animatePath(path, trafficLights) {
     const pathCoordinates = path.map(nodeId => {
         const light = trafficLights[nodeId];
@@ -365,7 +351,6 @@ function animatePath(path, trafficLights) {
     drawNextSegment();
 }
 
-// Update the route button to dynamically load traffic lights and find the shortest path
 routeBtn.addEventListener('click', async (event) => {
     event.preventDefault();
 
@@ -382,25 +367,68 @@ routeBtn.addEventListener('click', async (event) => {
         return;
     }
 
-    // Add source and destination as temporary nodes
-    const sourceNode = trafficLights.length; // Temporary node for source
-    const destNode = trafficLights.length + 1; // Temporary node for destination
+    const sourceNode = trafficLights.length; 
+    const destNode = trafficLights.length + 1; 
 
     trafficLights.push({ id: sourceNode, lat: sourceCoords[0], lon: sourceCoords[1] });
     trafficLights.push({ id: destNode, lat: destCoords[0], lon: destCoords[1] });
 
-    // Connect source and destination to multiple nearby traffic lights
     connectToMultipleNodes(sourceCoords[0], sourceCoords[1], trafficLights, graphEdges, sourceNode);
     connectToMultipleNodes(destCoords[0], destCoords[1], trafficLights, graphEdges, destNode);
 
     findShortestPath(trafficLights, graphEdges);
 });
 
-// Add map click handler
 map.on('click', (e) => {
     const { lat, lng } = e.latlng;
     destInput.value = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     addMarker(lat, lng, 'destination');
     validateInputs();
 });
-// <-------------------suyash-------------------->
+
+// Menu Toggle Functionality
+document.getElementById('menuToggle').addEventListener('click', function() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('active');
+    mapOverlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
+});
+
+// Close sidebar when clicking outside
+document.addEventListener('click', function(event) {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    if (!sidebar.contains(event.target) && !menuToggle.contains(event.target)) {
+        sidebar.classList.remove('active');
+        mapOverlay.style.display = 'none';
+    }
+});
+
+// Update the location button functionality
+showLocationBtn.addEventListener('click', function() {
+    if (navigator.geolocation) {
+        showLocationBtn.disabled = true;
+        showLocationBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting Location...';
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                sourceInput.value = `${lat},${lng}`;
+                addMarker(lat, lng, 'source');
+                validateInputs();
+                showLocationBtn.disabled = false;
+                showLocationBtn.innerHTML = '<i class="fas fa-location-dot"></i> Show Location';
+            },
+            (error) => {
+                sourceError.textContent = 'Could not get your location. Please enter coordinates manually.';
+                sourceError.style.display = 'block';
+                showLocationBtn.disabled = false;
+                showLocationBtn.innerHTML = '<i class="fas fa-location-dot"></i> Show Location';
+            }
+        );
+    } else {
+        sourceError.textContent = 'Geolocation is not supported by your browser';
+        sourceError.style.display = 'block';
+    }
+});

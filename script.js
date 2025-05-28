@@ -2,15 +2,15 @@
 const menuToggle = document.getElementById('menuToggle');
 const sidebar = document.getElementById('sidebar');
 
-// Prevent clicks inside sidebar from closing it
+// Prevent clicks inside sidebar from propagating
 sidebar.addEventListener('click', (event) => {
     event.stopPropagation();
 });
 
+// Only toggle menu with hamburger icon
 menuToggle.addEventListener('click', (event) => {
     event.stopPropagation();
-    sidebar.classList.toggle('active');
-    menuToggle.classList.toggle('active');
+    sidebar.classList.toggle('closed');
 });
 
 // Add map overlay
@@ -34,6 +34,8 @@ liveLocationBtn.textContent = 'Use My Location';
 liveLocationBtn.className = 'live-location-btn';
 sourceInput.parentNode.insertBefore(liveLocationBtn, sourceInput.nextSibling);
 
+const distanceElement = document.getElementById('distance');
+const timeElement = document.getElementById('time');
 
 const icons = {
     source: L.icon({
@@ -253,6 +255,32 @@ function findClosestNode(lat, lon, trafficLights) {
     return closestNode;
 }
 
+function calculateRouteStats(path, trafficLights) {
+    let totalDistance = 0;
+    
+    // Calculate total distance along the path
+    for (let i = 0; i < path.length - 1; i++) {
+        const currentLight = trafficLights[path[i]];
+        const nextLight = trafficLights[path[i + 1]];
+        totalDistance += calculateDistance(currentLight.lat, currentLight.lon, nextLight.lat, nextLight.lon);
+    }
+
+    // Round distance to 2 decimal places
+    totalDistance = Math.round(totalDistance * 100) / 100;
+
+    // Estimate time: Assuming average speed of 40 km/h in city with traffic lights
+    // Adding 30 seconds for each traffic light stop
+    const averageSpeed = 40; // km/h
+    const timeInHours = totalDistance / averageSpeed;
+    const trafficLightDelay = (path.length - 2) * 0.5; // 30 seconds = 0.5 minutes per light
+    const totalTimeInMinutes = Math.round((timeInHours * 60) + trafficLightDelay);
+
+    return {
+        distance: totalDistance,
+        time: totalTimeInMinutes
+    };
+}
+
 function findShortestPath(trafficLights, graphEdges) {
     const sourceCoords = sourceInput.value.split(',').map(Number);
     const destCoords = destInput.value.split(',').map(Number);
@@ -263,6 +291,9 @@ function findShortestPath(trafficLights, graphEdges) {
     if (sourceNode === null || destNode === null) {
         statusElement.textContent = 'Could not find traffic lights near source or destination. Try different coordinates.';
         console.log('Path not found: Could not find closest traffic lights');
+        // Reset stats when no path is found
+        distanceElement.textContent = '--';
+        timeElement.textContent = '--';
         return;
     }
 
@@ -316,8 +347,16 @@ function findShortestPath(trafficLights, graphEdges) {
     if (path[0] !== sourceNode) {
         statusElement.textContent = 'No valid path found between source and destination. Try coordinates with better traffic light coverage.';
         console.log('Path not found');
+        // Reset stats when no path is found
+        distanceElement.textContent = '--';
+        timeElement.textContent = '--';
         return;
     }
+
+    // Calculate and display route statistics
+    const stats = calculateRouteStats(path, trafficLights);
+    distanceElement.textContent = stats.distance;
+    timeElement.textContent = stats.time;
 
     statusElement.textContent = 'Route found successfully!';
     console.log('Path found');
@@ -341,7 +380,6 @@ function connectToMultipleNodes(lat, lon, trafficLights, graphEdges, nodeId) {
         graphEdges.push([closestNode, nodeId, Math.round(distance * 1000)]);
     }
 }
-
 
 function displayShortestPath(path, trafficLights) {
     // Clear any existing traffic lights first
@@ -522,7 +560,12 @@ function resetMapState() {
     });
     currentTrafficLights = [];
 
-    // Reset bounding box and other variables
+    // Reset stats and status
+    distanceElement.textContent = '--';
+    timeElement.textContent = '--';
+    statusElement.textContent = 'Enter coordinates to begin';
+
+    // Reset other variables
     sourceError.textContent = '';
     destError.textContent = '';
     routeBtn.disabled = true;

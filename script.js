@@ -324,11 +324,6 @@ function connectToMultipleNodes(lat, lon, trafficLights, graphEdges, nodeId) {
 // <-------------------suyash-------------------->
 // Function to display only the traffic lights on the shortest path
 function displayShortestPath(path, trafficLights) {
-    trafficLights.forEach(light => {
-        if (light.marker) {
-            map.removeLayer(light.marker);
-        }
-    });
 
     path.forEach(nodeId => {
         const light = trafficLights[nodeId];

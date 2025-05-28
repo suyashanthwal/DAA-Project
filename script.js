@@ -1,3 +1,18 @@
+// Menu Toggle Functionality
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+
+// Prevent clicks inside sidebar from closing it
+sidebar.addEventListener('click', (event) => {
+    event.stopPropagation();
+});
+
+menuToggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    sidebar.classList.toggle('active');
+    menuToggle.classList.toggle('active');
+});
+
 // Add map overlay
 const mapOverlay = document.createElement('div');
 mapOverlay.className = 'map-overlay';
@@ -39,6 +54,10 @@ let markers = {
     route: null
 };
 
+let currentPolyline = null;
+let currentTrafficLights = [];
+
+const statusElement = document.getElementById('status');
 
 function validateCoordinate(input, errorElement) {
     const value = input.value.trim();
@@ -166,9 +185,20 @@ async function loadTrafficLightsForBoundingBox(sourceCoords, destCoords) {
 
         const trafficLights = await getTrafficLights(bbox);
 
+        if (trafficLights.length === 0) {
+            statusElement.textContent = 'No traffic lights found in the area. Try different coordinates.';
+            return { trafficLights: [], graphEdges: [] };
+        }
+
         const { graphEdges } = constructGraph(trafficLights);
+        if (graphEdges.length === 0) {
+            statusElement.textContent = 'Traffic lights are too far apart. Try coordinates closer together.';
+            return { trafficLights: [], graphEdges: [] };
+        }
+
         return { trafficLights, graphEdges };
     } catch (error) {
+        statusElement.textContent = 'Error loading traffic lights. Please try again.';
         return { trafficLights: [], graphEdges: [] };
     }
 }
@@ -231,6 +261,7 @@ function findShortestPath(trafficLights, graphEdges) {
     const destNode = findClosestNode(destCoords[0], destCoords[1], trafficLights);
 
     if (sourceNode === null || destNode === null) {
+        statusElement.textContent = 'Could not find traffic lights near source or destination. Try different coordinates.';
         console.log('Path not found: Could not find closest traffic lights');
         return;
     }
@@ -283,10 +314,12 @@ function findShortestPath(trafficLights, graphEdges) {
     path.reverse();
 
     if (path[0] !== sourceNode) {
+        statusElement.textContent = 'No valid path found between source and destination. Try coordinates with better traffic light coverage.';
         console.log('Path not found');
         return;
     }
 
+    statusElement.textContent = 'Route found successfully!';
     console.log('Path found');
     displayShortestPath(path, trafficLights);
 }
@@ -311,6 +344,13 @@ function connectToMultipleNodes(lat, lon, trafficLights, graphEdges, nodeId) {
 
 
 function displayShortestPath(path, trafficLights) {
+    // Clear any existing traffic lights first
+    currentTrafficLights.forEach(light => {
+        if (light.marker) {
+            map.removeLayer(light.marker);
+        }
+    });
+    currentTrafficLights = [];
 
     path.forEach(nodeId => {
         const light = trafficLights[nodeId];
@@ -321,6 +361,7 @@ function displayShortestPath(path, trafficLights) {
                 iconAnchor: [10, 32]
             })
         }).addTo(map).bindPopup('Traffic Light');
+        currentTrafficLights.push(light);
     });
 
     animatePath(path, trafficLights);
@@ -332,38 +373,86 @@ function animatePath(path, trafficLights) {
         return [light.lat, light.lon];
     });
 
-    let index = 0;
-    const polyline = L.polyline([], { color: 'blue', weight: 4 }).addTo(map);
+    // Remove existing polyline if it exists
+    if (currentPolyline) {
+        map.removeLayer(currentPolyline);
+    }
 
-    function drawNextSegment() {
-        if (index < pathCoordinates.length) {
-            polyline.addLatLng(pathCoordinates[index]);
+    // Create the polyline with custom options
+    currentPolyline = L.polyline(pathCoordinates, {
+        className: 'animated-path',
+        color: '#ff3b30',  // Changed to red
+        weight: 4,
+        opacity: 1,
+        smoothFactor: 1
+    }).addTo(map);
+
+    // Fit the map bounds to show the entire route
+    map.fitBounds(currentPolyline.getBounds(), {
+        padding: [50, 50],
+        maxZoom: 15
+    });
+
+    // Calculate timing for traffic lights to match path animation
+    const totalAnimationTime = 3500; // 3.5s to match CSS animation
+    const delayPerLight = totalAnimationTime / path.length;
+
+    // Animate traffic lights sequentially
+    let index = 0;
+    function animateTrafficLights() {
+        if (index < path.length) {
+            const currentNodeId = path[index];
+            const light = trafficLights[currentNodeId];
+
+            if (light.marker) {
+                light.marker.setIcon(
+                    L.icon({
+                        iconUrl: 'scr/icons8-traffic-light-48.png',
+                        iconSize: [25, 25],
+                        iconAnchor: [10, 32],
+                        className: 'traffic-light-marker'
+                    })
+                );
+
+                // Add a subtle pop animation to the marker
+                const markerElement = light.marker.getElement();
+                if (markerElement) {
+                    markerElement.style.transform += ' scale(1.2)';
+                    setTimeout(() => {
+                        markerElement.style.transform = markerElement.style.transform.replace(' scale(1.2)', '');
+                    }, 300);
+                }
+            }
+
             index++;
-            setTimeout(drawNextSegment, 300);
+            setTimeout(animateTrafficLights, delayPerLight);
         }
     }
 
-    drawNextSegment();
+    // Start traffic light animation after a short delay
+    setTimeout(animateTrafficLights, 200);
 }
 
 routeBtn.addEventListener('click', async (event) => {
     event.preventDefault();
+    statusElement.textContent = 'Calculating route...';
 
     const sourceCoords = sourceInput.value.split(',').map(Number);
     const destCoords = destInput.value.split(',').map(Number);
 
     if (!sourceCoords || !destCoords || sourceCoords.length !== 2 || destCoords.length !== 2) {
+        statusElement.textContent = 'Invalid coordinates format. Please use lat,lng format.';
         return;
     }
 
     const { trafficLights, graphEdges } = await loadTrafficLightsForBoundingBox(sourceCoords, destCoords);
 
     if (trafficLights.length === 0 || graphEdges.length === 0) {
-        return;
+        return; // Status is already set in loadTrafficLightsForBoundingBox
     }
 
-    const sourceNode = trafficLights.length; 
-    const destNode = trafficLights.length + 1; 
+    const sourceNode = trafficLights.length;
+    const destNode = trafficLights.length + 1;
 
     trafficLights.push({ id: sourceNode, lat: sourceCoords[0], lon: sourceCoords[1] });
     trafficLights.push({ id: destNode, lat: destCoords[0], lon: destCoords[1] });
@@ -379,24 +468,6 @@ map.on('click', (e) => {
     destInput.value = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     addMarker(lat, lng, 'destination');
     validateInputs();
-});
-
-// Menu Toggle Functionality
-document.getElementById('menuToggle').addEventListener('click', function() {
-    const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('active');
-    mapOverlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
-});
-
-// Close sidebar when clicking outside
-document.addEventListener('click', function(event) {
-    const sidebar = document.getElementById('sidebar');
-    const menuToggle = document.getElementById('menuToggle');
-    
-    if (!sidebar.contains(event.target) && !menuToggle.contains(event.target)) {
-        sidebar.classList.remove('active');
-        mapOverlay.style.display = 'none';
-    }
 });
 
 // Update the location button functionality
@@ -425,5 +496,63 @@ showLocationBtn.addEventListener('click', function() {
     } else {
         sourceError.textContent = 'Geolocation is not supported by your browser';
         sourceError.style.display = 'block';
+    }
+});
+
+function resetMapState() {
+    // Remove all markers
+    Object.keys(markers).forEach(type => {
+        if (markers[type]) {
+            map.removeLayer(markers[type]);
+            markers[type] = null;
+        }
+    });
+
+    // Remove any existing route polyline
+    if (currentPolyline) {
+        map.removeLayer(currentPolyline);
+        currentPolyline = null;
+    }
+
+    // Remove all traffic light markers
+    currentTrafficLights.forEach(light => {
+        if (light.marker) {
+            map.removeLayer(light.marker);
+        }
+    });
+    currentTrafficLights = [];
+
+    // Reset bounding box and other variables
+    sourceError.textContent = '';
+    destError.textContent = '';
+    routeBtn.disabled = true;
+}
+
+// Update destination input event listener to reset map state and calculate new bounding box
+destInput.addEventListener('input', async () => {
+    resetMapState();
+    if (validateCoordinate(destInput, destError)) {
+        const [lat, lng] = destInput.value.split(',').map(Number);
+        addMarker(lat, lng, 'destination');
+
+        const sourceCoords = sourceInput.value.split(',').map(Number);
+        const destCoords = [lat, lng];
+
+        if (sourceCoords.length === 2 && destCoords.length === 2) {
+            const { trafficLights, graphEdges } = await loadTrafficLightsForBoundingBox(sourceCoords, destCoords);
+
+            if (trafficLights.length > 0 && graphEdges.length > 0) {
+                const sourceNode = trafficLights.length; 
+                const destNode = trafficLights.length + 1; 
+
+                trafficLights.push({ id: sourceNode, lat: sourceCoords[0], lon: sourceCoords[1] });
+                trafficLights.push({ id: destNode, lat: destCoords[0], lon: destCoords[1] });
+
+                connectToMultipleNodes(sourceCoords[0], sourceCoords[1], trafficLights, graphEdges, sourceNode);
+                connectToMultipleNodes(destCoords[0], destCoords[1], trafficLights, graphEdges, destNode);
+
+                findShortestPath(trafficLights, graphEdges);
+            }
+        }
     }
 });
